@@ -1,0 +1,46 @@
+tasks:
+  morning_briefing:
+    type: custom
+    session: alpha
+    cron: 0 6 * * *
+    description: "Morning briefing: weather, calendar, actionable messages, news"
+    prompt: >
+      RULES: No narration. No thought process. Gather all data silently.
+      Send ONE Telegram message at the end via curl. If a step fails, skip it silently.
+
+      STEP 1 — Weather: python3 ~/Projects/halos/scripts/weather.py
+
+      STEP 2 — Calendar: python3 ~/Projects/halos/scripts/calendar_today.py today
+
+      STEP 3 — iMessages: sqlite3 ~/Library/Messages/chat.db
+        "SELECT h.id AS contact, m.text, datetime(m.date/1000000000 + 978307200, 'unixepoch', 'localtime') AS ts,
+         m.is_from_me FROM message m JOIN handle h ON m.handle_id = h.ROWID
+         WHERE m.date > (strftime('%s','now','-24 hours') - 978307200) * 1000000000
+         AND m.text IS NOT NULL ORDER BY m.date DESC LIMIT 100;"
+
+      STEP 4 — Compose and send ONE Telegram message (under 300 words) via curl.
+      Format: [Day, Date] — Morning Update
+
+      Weather: [one line]
+      Today: [calendar events]
+      Heads up: [action items if any]
+
+    notify: true
+
+  health_check:
+    type: health_check
+    cron: 0 */6 * * *
+    description: System health monitoring
+    notify: true
+
+  code_watch:
+    type: code_watch
+    cron: 0 9 * * *
+    description: Git activity watcher
+    notify: false
+
+  market_check:
+    type: market_check
+    cron: 0 10 * * 1-5
+    description: Market data alerts
+    notify: true

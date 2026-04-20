@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HalOS</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%E2%97%89%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@wterm/dom@0.1.8/src/terminal.css">
+<style>
+  :root { color-scheme: dark; }
+  html, body { height: 100%; margin: 0; background: #0b0b0b; overflow: hidden; }
+  body { font-family: ui-monospace, Menlo, monospace; color: #e6e6e6; display: flex; flex-direction: column; }
+  #tabs {
+    display: flex; height: 32px; background: #151515;
+    border-bottom: 1px solid #2a2a2a; flex: 0 0 auto; overflow-x: auto;
+  }
+  #tabs.hidden { display: none; }
+  #tabs .tab {
+    padding: 0 16px; display: flex; align-items: center; cursor: pointer;
+    font-size: 12px; color: #888; border: 0; border-right: 1px solid #2a2a2a;
+    background: transparent; user-select: none; white-space: nowrap;
+    font-family: inherit; transition: background 0.12s ease, color 0.12s ease;
+  }
+  #tabs .tab:hover { background: #1f1f1f; color: #cfcfcf; }
+  #tabs .tab.active { background: #0b0b0b; color: #e6e6e6; }
+  #tabs .tab:focus { outline: none; }
+  #terms { position: relative; flex: 1 1 auto; min-height: 0; }
+  .term-wrap { position: absolute; inset: 0; }
+  .term-wrap.hidden { display: none; }
+  .term-wrap .wterm, .term-wrap.wterm {
+    width: 100% !important; height: 100% !important;
+    border-radius: 0 !important; box-shadow: none !important;
+    box-sizing: border-box !important;
+  }
+  #status {
+    position: fixed; bottom: 4px; left: 6px; font-size: 10px;
+    opacity: 0.5; z-index: 10; pointer-events: none; transition: opacity .4s ease;
+  }
+  #status.hidden { opacity: 0; }
+</style>
+</head>
+<body>
+<nav id="tabs" role="tablist" aria-label="Agent terminals"></nav>
+<main id="terms"></main>
+<div id="status">connecting…</div>
+<script type="module">
+  import { WTerm } from "https://cdn.jsdelivr.net/npm/@wterm/dom@0.1.8/+esm";
+
+  const params = new URLSearchParams(window.location.search);
+  const tabsParam = params.get("tabs");
+  const singleCmd = params.get("cmd");
+
+  function parseTabs() {
+    if (tabsParam) {
+      return tabsParam.split(",").map(entry => {
+        const [a, b] = entry.split(":").map(s => s.trim());
+        return b ? { label: a, cmd: b } : { label: a, cmd: a };
+      }).filter(t => t.label);
+    }
+    if (singleCmd) return [{ label: singleCmd.split(" ")[0], cmd: singleCmd }];
+    return [{ label: "HalOS", cmd: null }];
+  }
+
+  const tabConfigs = parseTabs();
+
+  const statusEl = document.getElementById("status");
+  let statusTimer;
+  const setStatus = (t, sticky = false) => {
+    statusEl.textContent = t;
+    statusEl.classList.remove("hidden");
+    clearTimeout(statusTimer);
+    if (!sticky) statusTimer = setTimeout(() => statusEl.classList.add("hidden"), 1500);
+  };
+
+  const tabsContainer = document.getElementById("tabs");
+  const termsContainer = document.getElementById("terms");
+  if (tabConfigs.length <= 1) tabsContainer.classList.add("hidden");
+
+  let activeIndex = 0;
+  const tabs = [];
+
+  async function makeTab(cfg, index) {
+    const tabBtn = document.createElement("button");
+    tabBtn.className = "tab";
+    tabBtn.setAttribute("role", "tab");
+    tabBtn.setAttribute("aria-controls", `term-${index}`);
+    tabBtn.setAttribute("aria-selected", "false");
+    tabBtn.textContent = cfg.label;
+    tabBtn.addEventListener("click", () => activate(index));
+    tabsContainer.appendChild(tabBtn);
+
+    const termWrap = document.createElement("div");
+    termWrap.className = "term-wrap hidden";
+    termWrap.id = `term-${index}`;
+    termWrap.setAttribute("role", "textbox");
+    termWrap.setAttribute("aria-label", `${cfg.label} terminal`);
+    termWrap.setAttribute("aria-multiline", "true");
+    termWrap.setAttribute("aria-roledescription", "terminal");
+    termWrap.setAttribute("tabindex", "0");
+    termsContainer.appendChild(termWrap);
+
+    let ws, reconnectDelay = 500;
+    let cols = 80, rows = 24;
+    const sendToWs = (data) => { if (ws && ws.readyState === 1) ws.send(data); };
+
+    const term = new WTerm(termWrap, {
+      autoResize: true,
+      wasmUrl: "/wterm.wasm",
+      onData: sendToWs,
+      onResize: (c, r) => {
+        cols = c; rows = r;
+        sendToWs(`\x1b[RESIZE:${c};${r}]`);
+        if (index === activeIndex) setStatus(`${cfg.label} ${c}×${r}`);
+      },
+    });
+    await term.init();
+
+    termWrap.addEventListener("click", () => term.focus());
+
+    const cellFromEvent = (e) => {
+      const rect = termWrap.getBoundingClientRect();
+      const cw = rect.width / cols;
+      const ch = rect.height / rows;
+      const x = Math.min(cols, Math.max(1, Math.floor((e.clientX - rect.left) / cw) + 1));
+      const y = Math.min(rows, Math.max(1, Math.floor((e.clientY - rect.top) / ch) + 1));
+      return { x, y };
+    };
+    const modBits = (e) => (e.shiftKey ? 4 : 0) | (e.altKey ? 8 : 0) | (e.ctrlKey ? 16 : 0);
+    const btnCode = (e) => e.button === 1 ? 1 : e.button === 2 ? 2 : 0;
+    let pressedBtn = -1;
+
+    termWrap.addEventListener("mousedown", (e) => {
+      if (e.shiftKey) return;
+      const { x, y } = cellFromEvent(e);
+      const b = btnCode(e) | modBits(e);
+      pressedBtn = b;
+      sendToWs(`\x1b[<${b};${x};${y}M`);
+      e.preventDefault();
+    });
+    termWrap.addEventListener("mousemove", (e) => {
+      if (pressedBtn < 0) return;
+      const { x, y } = cellFromEvent(e);
+      sendToWs(`\x1b[<${pressedBtn + 32};${x};${y}M`);
+    });
+    window.addEventListener("mouseup", (e) => {
+      if (pressedBtn < 0) return;
+      const { x, y } = cellFromEvent(e);
+      sendToWs(`\x1b[<${pressedBtn};${x};${y}m`);
+      pressedBtn = -1;
+    });
+    termWrap.addEventListener("wheel", (e) => {
+      const { x, y } = cellFromEvent(e);
+      const b = (e.deltaY < 0 ? 64 : 65) | modBits(e);
+      sendToWs(`\x1b[<${b};${x};${y}M`);
+      e.preventDefault();
+    }, { passive: false });
+    termWrap.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const cmdQuery = cfg.cmd ? `?cmd=${encodeURIComponent(cfg.cmd)}` : "";
+    const wsUrl = `${proto}//${window.location.host}/api/terminal${cmdQuery}`;
+
+    function connect() {
+      ws = new WebSocket(wsUrl);
+      ws.binaryType = "arraybuffer";
+      ws.addEventListener("open", () => {
+        if (index === activeIndex) setStatus(`${cfg.label} connected`);
+        reconnectDelay = 500;
+      });
+      ws.addEventListener("message", (ev) => {
+        if (typeof ev.data === "string") term.write(ev.data);
+        else term.write(new Uint8Array(ev.data));
+      });
+      ws.addEventListener("close", (ev) => {
+        if (ev.code === 4404) {
+          term.write("\r\n\x1b[31m[spawn failed — not reconnecting]\x1b[0m\r\n");
+          if (index === activeIndex) setStatus(`${cfg.label} spawn failed`, true);
+          return;
+        }
+        term.write("\r\n\x1b[90m[session ended — reconnecting]\x1b[0m\r\n");
+        setTimeout(connect, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 5000);
+      });
+      ws.addEventListener("error", () => {
+        if (index === activeIndex) setStatus(`${cfg.label} error`, true);
+      });
+    }
+    connect();
+
+    return { index, cfg, term, termWrap, tabBtn };
+  }
+
+  function activate(i) {
+    activeIndex = i;
+    tabs.forEach((t, j) => {
+      const active = j === i;
+      t.termWrap.classList.toggle("hidden", !active);
+      t.tabBtn.classList.toggle("active", active);
+      t.tabBtn.setAttribute("aria-selected", String(active));
+    });
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+      tabs[i].term.focus();
+    });
+  }
+
+  for (let i = 0; i < tabConfigs.length; i++) {
+    tabs.push(await makeTab(tabConfigs[i], i));
+  }
+  activate(0);
+  window.addEventListener("focus", () => tabs[activeIndex]?.term.focus());
+</script>
+</body>
+</html>

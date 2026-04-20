@@ -1,0 +1,65 @@
+# SQLite database (local only, not versioned)
+.kb/kb.db
+.kb/kb.db-journal
+.kb/kb.db-wal
+.kb/kb.db-shm
+kb.db
+kb.db-journal
+kb.db-wal
+kb.db-shm
+
+# System internals (local state)
+.kb/jobs/
+.kb/costs.json
+.kb/archive/
+.omc/
+
+# Raw source materials (local only, not versioned)
+raw/
+
+# Outputs (ephemeral)
+outputs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup rotation (keep only recent backups tracked if desired)
+# For now, exclude all backups
+.kb/backups/
+
+# Logs
+*.log
+.kb/logs/
+
+# Temporary files
+*.tmp
+.tmp/

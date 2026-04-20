@@ -1,0 +1,1 @@
+"""HalOS task types."""

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+KB_DIR="$HOME/Projects/knowledge-base"
+cd "$KB_DIR" && python3 -m kb.cli "$@"

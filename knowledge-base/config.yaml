@@ -1,0 +1,64 @@
+# Knowledge Base System Configuration
+
+knowledge_base:
+  root: ~/Projects/knowledge-base
+  db_path: .kb/kb.db
+
+  compilation:
+    model: sonnet              # haiku|sonnet|opus
+    batch_size: 5              # Files per batch
+    auto_review: false         # If true, skip review queue (DANGEROUS)
+    budget:
+      daily_usd: 5.00
+      per_article_max_tokens: 10000
+      alert_threshold_usd: 0.50
+
+  search:
+    max_results: 20
+    recency_boost_days: 7
+    recency_boost_multiplier: 1.1
+
+  query:
+    default_model: sonnet
+    default_articles: 5        # Max articles for context
+    cost_limit_usd: 0.25       # Default per-query limit
+
+  security:
+    pii_scan: true
+    default_classification: internal  # public|internal|confidential
+    allowed_classifications: [public, internal, confidential]
+
+  retention:
+    session_days: 90           # Auto-delete sessions after 90 days
+    output_days: 30            # Auto-delete outputs after 30 days
+
+  git:
+    auto_commit: true
+    commit_author: "KB System <kb@localhost>"
+
+  jobs:
+    worker_enabled: true
+    max_concurrent: 1          # MUST be 1 to prevent corruption
+    heartbeat_interval_s: 30
+    job_timeout_s: 3600
+
+  review:
+    notifications:
+      method: poll             # webhook | poll
+      # webhook_url: https://example.com/hooks/kb-review
+      # webhook_auth_token: ${WEBHOOK_TOKEN}
+      # webhook_retry_attempts: 3
+      # webhook_retry_delay_s: 5
+
+  maintenance:
+    backup:
+      max_backups: 10          # Keep 10 most recent backups
+      auto_backup_before_compile: true
+
+  ingest:
+    git:
+      clone_depth: 1           # Shallow clone (null for full)
+
+  halos:
+    enabled: true              # Enable HalOS integration (Phase 4)
+    agents: [alpha, beta, gamma]

@@ -1,0 +1,51 @@
+name: "HalOS"
+log_level: INFO
+db_path: "~/.halos/halos.db"
+memory_path: "~/.halos/memory.md"
+
+agents:
+  alpha:
+    bot_token: "YOUR_BOT_TOKEN_HERE"
+    project_dir: "~/Projects/halos/sessions/alpha"
+  gamma:
+    bot_token: "YOUR_BOT_TOKEN_HERE"
+    project_dir: "~/Projects/halos/sessions/gamma"
+  beta:
+    bot_token: "YOUR_BOT_TOKEN_HERE"
+    project_dir: "~/Projects/halos/sessions/beta"
+  delta:
+    bot_token: "YOUR_BOT_TOKEN_HERE"
+    project_dir: "~/Projects/halos/sessions/delta"
+
+claude_code:
+  binary_path: claude
+  default_model: sonnet
+  skip_permissions: true
+  timeout_seconds: 300
+  projects:
+    alpha: ~/Projects/halos/sessions/alpha
+    gamma: ~/Projects/halos/sessions/gamma
+    beta: ~/Projects/halos/sessions/beta
+    delta: ~/Projects/halos/sessions/delta
+
+scheduler:
+  timezone: America/New_York
+
+notifications:
+  telegram_chat_id: YOUR_CHAT_ID_HERE
+
+telegram:
+  bot_token: "YOUR_MAIN_BOT_TOKEN_HERE"
+  allowed_user_ids:
+    - YOUR_CHAT_ID_HERE
+  max_message_length: 4000
+  typing_indicator: true
+  progress_debounce_secs: 3
+
+anthropic:
+  api_key: "${OPENROUTER_API_KEY}"
+  model: anthropic/claude-sonnet-4-20250514
+
+kimi:
+  api_key: "${KIMI_API_KEY}"
+  model: moonshot-v1-128k
